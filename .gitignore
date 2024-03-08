@@ -1,0 +1,35 @@
+﻿# Build artifacts
+**/bin/
+**/obj/
+
+# Temporary generated files
+**/.vs/
+[Bb]in/
+[Dd]ebug/
+[Nn]uget/
+
+# Third-party library package references
+**/packages/
+
+# Secret configuration files (consider environment variables)
+appsettings*.json
+ConnectionStrings.config
+
+# Test results and logs
+**/TestResults/
+**/Logs/
+
+# IDE-specific files
+# Adjust based on your IDE (e.g., Visual Studio, Visual Studio Code)
+*.suo
+*.vbproj
+*.user
+
+.idea
+
+# Local development settings
+launchSettings.json
+
+# Any other files or directories you want to exclude
+# Add them here with appropriate patterns
+*.myignore

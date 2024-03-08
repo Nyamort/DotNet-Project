@@ -1,0 +1,63 @@
+﻿@page "/"
+@using Shared.ApiModels
+@using Microsoft.Extensions.Localization
+@using Client.Translations
+@inject IStringLocalizer<Dictionary> Localizer
+@inject HttpClient HttpClient
+
+<PageTitle>Home</PageTitle>
+
+<h3>@Localizer[nameof(Dictionary.VehiclesLateMaintenance)]</h3>
+
+@if (_vehicles == null)
+{
+    <p>@Localizer[nameof(Dictionary.Loading)]...</p>
+}
+else
+{
+    @if (_vehicles.Count != 0)
+    {
+        <table class="table">
+            <thead>
+            <tr>
+                <th>@Localizer[nameof(Dictionary.Brand)]</th>
+                <th>@Localizer[nameof(Dictionary.Model)]</th>
+                <th>@Localizer[nameof(Dictionary.LicensePlate)]</th>
+                <th>@Localizer[nameof(Dictionary.Late)]</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var vehicle in _vehicles)
+            {
+                <tr>
+                    <td>@vehicle.LicensePlate</td>
+                    <td>@vehicle.Model?.Name</td>
+                    <td>@vehicle.LicensePlate</td>
+                    <td>@vehicle.NextMaintenanceKilometers Km</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+
+    }
+    else
+    {
+        <p><em>@Localizer[nameof(Dictionary.AllVehiclesMaintained)]</em></p>
+    }
+}
+
+@code {
+
+    private IList<VehicleApi>? _vehicles;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _vehicles = await HttpClient.GetFromJsonAsync<IList<VehicleApi>>("api/Vehicle/Late");
+        }catch
+        {
+            _vehicles = new List<VehicleApi>();
+        }
+    }
+}

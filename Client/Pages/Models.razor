@@ -1,0 +1,179 @@
+﻿@page "/models"
+@using Shared.ApiModels
+@using Client.Translations
+@using Microsoft.Extensions.Localization
+@using Shared.Enums
+@inject HttpClient HttpClient
+@inject IJSRuntime JSRuntime
+@inject IStringLocalizer<Dictionary> Localizer
+
+<div class="d-flex justify-content-between">
+    <h3>@Localizer[nameof(Dictionary.ListModels)]</h3>
+    <button type="button" @onclick="@(OpenModal)" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createModal">
+        @Localizer[nameof(Dictionary.CreateModel)]
+    </button>
+</div>
+
+<div class="modal fade" id="createModal" tabindex="-1" aria-labelledby="createModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createModalLabel">@Localizer[nameof(Dictionary.CreateModel)]</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body gap-2 d-flex flex-column">
+
+                <label for="model-name">@Localizer[nameof(Dictionary.Name)]</label>
+                <input id="model-name" @bind="_newModel.Name" class="form-control" placeholder="fiesta"/>
+                <label for="model-maintenance-frequency">@Localizer[nameof(Dictionary.MaintenanceFrequency)]</label>
+                <input id="model-maintenance-frequency" @bind="_newModel.MaintenanceFrequency" class="form-control" placeholder="10000"/>
+                <label for="model-brand">@Localizer[nameof(Dictionary.Brand)]</label>
+                <InputSelect id="model-brand" class="form-select" @bind-Value="@_newModel.Brand">
+                    @foreach (var brand in Enum.GetValues(typeof(Brand)))
+                    {
+                        <option value="@brand">@brand</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Localizer[nameof(Dictionary.Close)]</button>
+                <button type="button" @onclick="@OnSave" data-bs-dismiss="modal" class="btn btn-primary">@Localizer[nameof(Dictionary.Save)]</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteModalLabel">@Localizer[nameof(Dictionary.DeleteModel)]</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                @if (_deleteModel != null)
+                {
+                    <p>@Localizer[nameof(Dictionary.DeleteModelConfirmation), _deleteModel.Name]</p>
+
+                }
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Localizer[nameof(Dictionary.Close)]</button>
+                <button type="button" @onclick="@DeleteModel" data-bs-dismiss="modal" class="btn btn-danger">@Localizer[nameof(Dictionary.Delete)]</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@if (_models == null)
+{
+    <p>@Localizer[nameof(Dictionary.Loading)]...</p>
+}
+else
+{
+    @if (_models.Count != 0)
+    {
+        <table class="table">
+            <thead>
+            <tr>
+                <th>@Localizer[nameof(Dictionary.Brand)]</th>
+                <th>@Localizer[nameof(Dictionary.Name)]</th>
+                <th>@Localizer[nameof(Dictionary.MaintenanceFrequency)]</th>
+                <th>@Localizer[nameof(Dictionary.Action)]</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var model in _models)
+            {
+                <tr>
+                    <td>@model.Brand</td>
+                    <td>@model.Name</td>
+                    <td>@model.MaintenanceFrequency</td>
+                    <td>
+                        <button type="button" class="btn btn-danger" @onclick="@(()=>OnSoftDelete(model))" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                            @Localizer[nameof(Dictionary.Delete)]
+                        </button>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <p>
+            <em>@Localizer[nameof(Dictionary.NoModels)]</em>
+        </p>
+    }
+}
+
+@code {
+    private IList<ModelApi>? _models { get; set; }
+    private CreateModelApi _newModel { get; set; } = new CreateModelApi();
+
+    private ModelApi? _deleteModel { get; set; }
+
+    private Task OnSoftDelete(ModelApi model)
+    {
+        _deleteModel = model;
+        return Task.CompletedTask;
+    }
+
+    private Task OpenModal()
+    {
+        _newModel = new CreateModelApi();
+        return Task.CompletedTask;
+    }
+
+    private async Task DeleteModel()
+    {
+        var httpResponseMessage = await HttpClient.DeleteAsync("api/Model/" + _deleteModel?.Id);
+        if (!httpResponseMessage.IsSuccessStatusCode)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", Localizer[nameof(Dictionary.Error)]);
+        }
+        else
+        {
+            if (_deleteModel != null) _models?.Remove(_deleteModel);
+        }
+
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        try
+        {
+            _models = await HttpClient.GetFromJsonAsync<IList<ModelApi>>("api/Model");
+        }
+        catch
+        {
+            _models = new List<ModelApi>();
+        }
+    }
+
+    private async Task OnSave()
+    {
+        var newModel = new
+        {
+            _newModel.Name,
+            _newModel.Brand,
+            _newModel.MaintenanceFrequency
+        };
+        JsonContent content = JsonContent.Create(newModel);
+        var httpResponseMessage=await HttpClient.PostAsync($"api/Model", content);
+        if (!httpResponseMessage.IsSuccessStatusCode)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", Localizer[nameof(Dictionary.Error)]);
+        }
+        else
+        {
+            var modelApi = httpResponseMessage.Content.ReadFromJsonAsync<ModelApi>().Result;
+            if (modelApi != null) _models?.Add(modelApi);
+        }
+
+    }
+
+}

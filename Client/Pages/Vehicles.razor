@@ -1,0 +1,208 @@
+﻿@page "/vehicles"
+@using Shared.ApiModels
+@using Client.Translations
+@using Microsoft.Extensions.Localization
+@using Shared.Enums
+@inject HttpClient HttpClient
+@inject IStringLocalizer<Dictionary> Localizer
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+
+
+<div class="d-flex justify-content-between">
+    <h3>@Localizer[nameof(Dictionary.ListVehicles)]</h3>
+    <button type="button" @onclick="@(OpenModal)" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createModal">
+        @Localizer[nameof(Dictionary.CreateVehicle)]
+    </button>
+</div>
+@if (_models != null)
+{
+    <div class="modal fade" id="createModal" tabindex="-1" aria-labelledby="createModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <EditForm Model="@_newVehicle" OnValidSubmit="OnSave"  class="modal-content">
+
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createModalLabel">@Localizer[nameof(Dictionary.CreateVehicle)]</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body gap-2 d-flex flex-column">
+                    <DataAnnotationsValidator/>
+                    <ValidationSummary/>
+                    <label>@Localizer[nameof(Dictionary.LicensePlate)]</label>
+                    <InputText @bind-Value="_newVehicle.LicensePlate" class="form-control" placeholder="AA-111-AA"/>
+                    <label>@Localizer[nameof(Dictionary.Year)]</label>
+                    <InputNumber TValue="int" @bind-Value="_newVehicle.Year" class="form-control" placeholder="2021"/>
+                    <label>@Localizer[nameof(Dictionary.Kilometers)]</label>
+                    <InputNumber TValue="int" @bind-Value="_newVehicle.Kilometers" class="form-control" placeholder="10000"/>
+                    <label>@Localizer[nameof(Dictionary.Energy)]</label>
+                    <InputSelect class="form-select" @bind-Value="_newVehicle.Energy">
+                        @foreach (var energy in Enum.GetValues(typeof(Energy)))
+                        {
+                            <option value="@energy">@energy</option>
+                        }
+                    </InputSelect>
+                    <label>@Localizer[nameof(Dictionary.Model)]</label>
+                    <InputSelect class="form-select" @bind-Value="_newVehicle.ModelId">
+                        @foreach (var vModel in _models)
+                        {
+                            <option value="@vModel.Id">@vModel.Brand - @vModel.Name</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Localizer[nameof(Dictionary.Close)]</button>
+                    <input type="submit" class="btn btn-primary" data-bs-dismiss="modal" value="@Localizer[nameof(Dictionary.Save)]"/>
+                </div>
+            </EditForm >
+        </div>
+    </div>
+}
+
+
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteModalLabel">@Localizer[nameof(Dictionary.DeleteModel)]</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                @if (_deleteVehicle != null)
+                {
+                    <p>@Localizer[nameof(Dictionary.DeleteVehicleConfirmation), _deleteVehicle.LicensePlate]</p>
+
+                }
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Localizer[nameof(Dictionary.Close)]</button>
+                <button type="button" @onclick="@DeleteModel" data-bs-dismiss="modal" class="btn btn-danger">@Localizer[nameof(Dictionary.Delete)]</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@if (_vehicles == null)
+{
+    <p>@Localizer[nameof(Dictionary.Loading)]...</p>
+}
+else
+{
+    @if (_vehicles.Count != 0)
+    {
+        <table class="table">
+            <thead>
+            <tr>
+                <th>@Localizer[nameof(Dictionary.Brand)]</th>
+                <th>@Localizer[nameof(Dictionary.Model)]</th>
+                <th>@Localizer[nameof(Dictionary.LicensePlate)]</th>
+                <th>@Localizer[nameof(Dictionary.Action)]</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var vehicle in _vehicles)
+            {
+                <tr role="button" @onclick='() => NavigationManager.NavigateTo($"/vehicles/{vehicle.Id}")'>
+                    <td>@vehicle.Model?.Brand</td>
+                    <td>@vehicle.Model?.Name</td>
+                    <td>@vehicle.LicensePlate</td>
+                    <td>
+                        <button type="button" class="btn btn-danger" @onclick:stopPropagation="true" @onclick="@(() => OnSoftDelete(vehicle))" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                            @Localizer[nameof(Dictionary.Delete)]
+                        </button>
+                    </td>
+
+                </tr>
+            }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <p>
+            <em>@Localizer[nameof(Dictionary.NoVehicles)]</em>
+        </p>
+    }
+}
+
+@code {
+    private CreateVehicleApi _newVehicle { get; set; } = new CreateVehicleApi();
+    private IList<VehicleApi>? _vehicles = new List<VehicleApi>();
+    private IList<ModelApi>? _models = new List<ModelApi>();
+    private VehicleApi? _deleteVehicle;
+
+
+    private Task OpenModal()
+    {
+        _newVehicle = new CreateVehicleApi();
+        return Task.CompletedTask;
+    }
+
+    private Task OnSoftDelete(VehicleApi vehicle)
+    {
+        _deleteVehicle = vehicle;
+        return Task.CompletedTask;
+    }
+
+    private async Task DeleteModel()
+    {
+        var httpResponseMessage = await HttpClient.DeleteAsync("api/Vehicule/" + _deleteVehicle?.Id);
+        if (!httpResponseMessage.IsSuccessStatusCode)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", Localizer[nameof(Dictionary.Error)]);
+        }
+        else
+        {
+            if (_deleteVehicle != null) _vehicles?.Remove(_deleteVehicle);
+        }
+
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _vehicles = await HttpClient.GetFromJsonAsync<IList<VehicleApi>>("api/Vehicle");
+        }
+        catch
+        {
+            _vehicles = new List<VehicleApi>();
+        }
+
+        try
+        {
+            _models = await HttpClient.GetFromJsonAsync<IList<ModelApi>>("api/Model");
+        }
+        catch
+        {
+            _models = new List<ModelApi>();
+        }
+    }
+
+    private async Task OnSave()
+    {
+        var newVehicle = new
+        {
+            _newVehicle.Energy,
+            _newVehicle.Year,
+            _newVehicle.LicensePlate,
+            _newVehicle.Kilometers,
+            _newVehicle.ModelId,
+        };
+        var content = JsonContent.Create(newVehicle);
+        var httpResponseMessage=await HttpClient.PostAsync($"api/Vehicle", content);
+        if (!httpResponseMessage.IsSuccessStatusCode)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", httpResponseMessage.Content.ReadAsStringAsync().Result);
+        }
+        else
+        {
+            var vehicleApi = httpResponseMessage.Content.ReadFromJsonAsync<VehicleApi>().Result;
+            if (vehicleApi != null) _vehicles?.Add(vehicleApi);
+            await JSRuntime.InvokeVoidAsync("$('#createModal').modal", "hide");
+        }
+
+    }
+
+}

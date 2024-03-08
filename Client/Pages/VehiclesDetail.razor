@@ -1,0 +1,238 @@
+﻿@page "/vehicles/{VehicleId:int}"
+@using Shared.ApiModels
+@using Client.Translations
+@using Microsoft.Extensions.Localization
+@using Shared.Enums
+@inject HttpClient HttpClient
+@inject IStringLocalizer<Dictionary> Localizer
+@inject IJSRuntime JSRuntime
+
+
+@if(_vehicle != null)
+{
+    <div class="modal fade" id="createModal" tabindex="-1" aria-labelledby="createModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createModalLabel">@Localizer[nameof(Dictionary.CreateVehicle)]</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body gap-2 d-flex flex-column">
+                    <label>@Localizer[nameof(Dictionary.Date)]</label>
+                    <input @bind="_newMaintenance.Date" class="form-control" type="date"/>
+                    <label>@Localizer[nameof(Dictionary.Kilometers)]</label>
+                    <input @bind="_newMaintenance.Kilometers" class="form-control" type="number" placeholder="10000"/>
+                    <label>@Localizer[nameof(Dictionary.Description)]</label>
+                    <textarea @bind="_newMaintenance.Description" class="form-control" rows="3"></textarea>
+
+
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Localizer[nameof(Dictionary.Close)]</button>
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal" @onclick="@OnSave">@Localizer[nameof(Dictionary.Save)]</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editModalLabel">@Localizer[nameof(Dictionary.EditVehicle)]</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body gap-2 d-flex flex-column">
+                    <label>@Localizer[nameof(Dictionary.LicensePlate)]</label>
+                    <input @bind="_editVehicle.LicensePlate" class="form-control" placeholder="AA-00-00" required/>
+                    <label>@Localizer[nameof(Dictionary.Year)]</label>
+                    <input @bind="_editVehicle.Year" class="form-control" placeholder="2021" required/>
+                    <label>@Localizer[nameof(Dictionary.Kilometers)]</label>
+                    <input @bind="_editVehicle.Kilometers" class="form-control" placeholder="10000" required/>
+                    <label>@Localizer[nameof(Dictionary.Energy)]</label>
+                    <InputSelect class="form-select" @bind-Value="@_editVehicle.Energy">
+                        @foreach (var energy in Enum.GetValues(typeof(Energy)))
+                        {
+                            <option value="@energy">@energy</option>
+                        }
+                    </InputSelect>
+                    <label>@Localizer[nameof(Dictionary.Model)]</label>
+                    @if(_models == null)
+                    {
+                        <p>@Localizer[nameof(Dictionary.Loading)]...</p>
+                    }
+                    else
+                    {
+                        <InputSelect class="form-select" @bind-Value="@_editVehicle.ModelId">
+                            @foreach (var model in _models)
+                            {
+                                <option value="@model.Id">
+                                    @model.Name
+                                </option>
+                            }
+                        </InputSelect>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Localizer[nameof(Dictionary.Close)]</button>
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal" @onclick="@OnEdit">@Localizer[nameof(Dictionary.Save)]</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+
+    <div class="d-flex gap-5">
+        <div class="card w-50 h-25">
+            <div class="card-header d-flex justify-content-between">
+                <h3>@Localizer[nameof(Dictionary.Vehicle)] "@_vehicle.LicensePlate"</h3>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#editModal">@Localizer[nameof(Dictionary.Edit)]</button>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <label>@Localizer[nameof(Dictionary.Brand)]</label><span>@_vehicle.Model?.Brand</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <label>@Localizer[nameof(Dictionary.Model)]</label><span>@_vehicle.Model?.Name</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <label>@Localizer[nameof(Dictionary.Year)]</label><span>@_vehicle.Year</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <label>@Localizer[nameof(Dictionary.LicensePlate)]</label><span>@_vehicle.LicensePlate</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <label>@Localizer[nameof(Dictionary.Energy)]</label><span>@_vehicle.Energy</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <label>@Localizer[nameof(Dictionary.Kilometers)]</label><span>@_vehicle.Kilometers</span>
+                </div>
+            </div>
+
+        </div>
+        <div class="card w-50">
+                <div class="card-header d-flex justify-content-between">
+                    <h3>@Localizer[nameof(Dictionary.Maintenances)]</h3>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createModal">@Localizer[nameof(Dictionary.AddMaintenance)]</button>
+                </div>
+                <div class="d-flex flex-column h-100">
+                    @if(_vehicle.Maintenances.Count == 0)
+                    {
+                        <div class="d-flex justify-content-center align-items-center h-100">
+                            <span>@Localizer[nameof(Dictionary.NoMaintenances)]</span>
+                        </div>
+                    }
+                    else
+                    {
+                        @foreach (var maintenance in _vehicle.Maintenances)
+                        {
+                            <div class="d-flex border-bottom h-100">
+                                <div class="w-25 px-2 py-2 border-end">
+                                    @maintenance.Kilometers Km
+                                </div>
+                                <div class="px-2 py-2" style="white-space: pre-line">
+                                    @maintenance.Description
+                                </div>
+                            </div>
+                        }
+                    }
+
+                </div>
+
+            </div>
+    </div>
+
+
+
+}
+else
+{
+    <h1>@Localizer[nameof(Dictionary.VehicleNotFound)]</h1>
+}
+
+
+@code {
+    private VehicleApi? _vehicle;
+    private CreateMaintenanceApi _newMaintenance = new CreateMaintenanceApi();
+    private EditVehicleApi? _editVehicle;
+    private IList<ModelApi>? _models = new List<ModelApi>();
+
+    [Parameter]
+    public int VehicleId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _vehicle = await HttpClient.GetFromJsonAsync<VehicleApi>($"api/vehicle/{VehicleId}");
+            if (_vehicle != null)
+                _editVehicle = new EditVehicleApi
+                {
+                    LicensePlate = _vehicle.LicensePlate,
+                    Year = _vehicle.Year,
+                    Kilometers = _vehicle.Kilometers,
+                    Energy = _vehicle.Energy,
+                    ModelId = _vehicle.ModelId
+                };
+        }catch
+        {
+            await JSRuntime.InvokeVoidAsync("alert", Localizer[nameof(Dictionary.Error)].Value);
+        }
+
+        try
+        {
+            _models = await HttpClient.GetFromJsonAsync<IList<ModelApi>>("api/model");
+        }
+        catch
+        {
+            await JSRuntime.InvokeVoidAsync("alert", Localizer[nameof(Dictionary.Error)].Value);
+        }
+    }
+
+    private async Task OnSave()
+    {
+        try
+        {
+            var httpResponseMessage = await HttpClient.PostAsJsonAsync($"api/vehicle/{VehicleId}/maintenance", _newMaintenance);
+            if (httpResponseMessage.IsSuccessStatusCode)
+            {
+                var maintenance = await httpResponseMessage.Content.ReadFromJsonAsync<MaintenanceApi>();
+                if (maintenance != null && _vehicle != null)
+                {
+                    _vehicle.Maintenances.Add(maintenance);
+                    _newMaintenance = new CreateMaintenanceApi();
+                }
+            }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("alert", httpResponseMessage.Content.ReadAsStringAsync().Result);
+
+            }
+        }
+        catch
+        {
+            await JSRuntime.InvokeVoidAsync("alert", Localizer[nameof(Dictionary.Error)]);
+        }
+    }
+
+    private async Task OnEdit()
+    {
+        try
+        {
+            var httpResponseMessage = await HttpClient.PutAsJsonAsync($"api/vehicle/{VehicleId}", _editVehicle);
+            if (!httpResponseMessage.IsSuccessStatusCode)
+            {
+                await JSRuntime.InvokeVoidAsync("alert", Localizer[nameof(Dictionary.Error)]);
+            }else
+            {
+                _vehicle = await HttpClient.GetFromJsonAsync<VehicleApi>($"api/vehicle/{VehicleId}");
+            }
+        }
+        catch
+        {
+            await JSRuntime.InvokeVoidAsync("alert", Localizer[nameof(Dictionary.Error)]);
+        }
+    }
+
+}
